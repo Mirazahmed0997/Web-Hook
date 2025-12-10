@@ -23,7 +23,7 @@ function verifyShopifyWebhook(req, res, next) {
   next();
 }
 
-app.post("/webhook/orders-create", verifyShopifyWebhook, (req, res) => {
+app.post("/webhook/cart-create", verifyShopifyWebhook, (req, res) => {
   const body = JSON.parse(req.body.toString());
   console.log("New Order Webhook Received:", body);
   res.status(200).send("Webhook received");
