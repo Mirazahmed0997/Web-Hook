@@ -37,6 +37,16 @@ app.post("/apps/cod-order", async (req, res) => {
   }
 });
 
+app.get("/apps/cod-order", async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ created_at: -1 }); // latest first
+    res.status(200).json({ success: true, orders });
+  } catch (err) {
+    console.error("Error fetching orders:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 app.get("/", (req, res) => res.send("Server running"));
 
