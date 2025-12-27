@@ -1,88 +1,56 @@
-
-
-
-
-
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import mongoose from "mongoose";
-
-dotenv.config();
 
 const app = express();
 
-app.use(
-  cors({
-    origin: true,       
-    credentials: true, 
-  })
-);
-
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
+// ✅ MongoDB connection (singleton)
+let isConnected = false;
 
-const MONGO_URI = process.env.MONGO_URI;
+async function connectDB() {
+  if (isConnected) return;
+  await mongoose.connect(process.env.MONGO_URI);
+  isConnected = true;
+  console.log("MongoDB connected");
+}
 
-mongoose
-  .connect(MONGO_URI) 
-  .then(() => console.log(" MongoDB connected"))
-  .catch(err => console.error("MongoDB connection error:", err));
+// Schema
+const orderSchema = new mongoose.Schema({}, { strict: false });
+const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);
 
+/* ------------------ ROUTES ------------------ */
 
-const orderSchema = new mongoose.Schema({}, { strict: false }); 
-const Order = mongoose.model("Order", orderSchema);
-
-
-app.post("/apps/cod-order", async (req, res) => {
+// POST
+app.post("/api/cod-order", async (req, res) => {
   try {
-    const body = req.body;
-    console.log("New COD Order Received:", body);
+    await connectDB();
 
-    const order = new Order(body);  
+    const order = new Order(req.body);
     await order.save();
 
-    res.status(200).json({ success: true, received: body, message: "Order saved to DB " });
+    res.json({ success: true, message: "Order saved" });
   } catch (err) {
-    console.error("Error saving order:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// app.get("/apps/cod-order", async (req, res) => {
-//   try {
-//     const orders = await Order.find().sort({ created_at: -1 }); // latest first
-//     res.status(200).json({ success: true, orders });
-//   } catch (err) {
-//     console.error("Error fetching orders:", err);
-//     res.status(500).json({ success: false, error: err.message });
-//   }
-// });
-
-
-
-app.get("/apps/cod-order", async (req, res) => {
+// GET (list)
+app.get("/api/cod-order", async (req, res) => {
   try {
-    // Flexible: Accept both page/limit OR skip/limit
-    let page = parseInt(req.query.page) || 1;
-    let limit = parseInt(req.query.limit) || 10;
+    await connectDB();
 
-    // If frontend uses skip instead of page
-    if (req.query.skip !== undefined) {
-      const skip = parseInt(req.query.skip) || 0;
-      page = Math.floor(skip / limit) + 1;
-    }
-
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
     const search = (req.query.search || "").trim();
-    const sortBy = req.query.sortBy || "createdAt"; // use createdAt (Mongo auto field)
-    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
 
-    // Search query
-    let searchQuery = {};
+    let query = {};
     if (search) {
-      searchQuery = {
+      query = {
         $or: [
           { "customer.name": { $regex: search, $options: "i" } },
           { "customer.phone": { $regex: search, $options: "i" } },
@@ -91,65 +59,39 @@ app.get("/apps/cod-order", async (req, res) => {
       };
     }
 
-    // Fetch data
     const [orders, total] = await Promise.all([
-      Order.find(searchQuery)
-        .sort({ [sortBy]: sortOrder })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Order.countDocuments(searchQuery),
+      Order.find(query).sort({ created_at: -1 }).skip(skip).limit(limit),
+      Order.countDocuments(query),
     ]);
-
-    // Always return pagination info (safe even when total = 0)
-    const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
 
     res.json({
       success: true,
       orders,
       pagination: {
-        currentPage: page,
-        totalPages,
-        totalOrders: total,
-        limit,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
+        page,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (err) {
-    console.error("Error fetching orders:", err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
-
-
-
-// GET /apps/cod-order/:id
-app.get("/apps/cod-order/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    console.log(id)
-
-    const order = await Order.findById(id);
-
-    if (!order) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Order not found" });
-    }
-
-    res.status(200).json({ success: true, order });
-  } catch (err) {
-    console.error("Error fetching single order:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
+// GET single
+app.get("/api/cod-order/:id", async (req, res) => {
+  try {
+    await connectDB();
 
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false });
+    }
 
-app.get("/", (req, res) => res.send("Server running"));
+    res.json({ success: true, order });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+export default app;
