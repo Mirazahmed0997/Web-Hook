@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import serverless from "serverless-http";
 
 
 dotenv.config();
@@ -269,8 +268,10 @@ app.post("/users/logout", authenticateJWT, (req, res) => {
 
 
 
-
 app.get("/", (req, res) => res.send("Server running"));
 
-export const handler = serverless(app);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
