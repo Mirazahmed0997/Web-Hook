@@ -130,6 +130,9 @@ app.post("/users/login", async (req, res) => {
 });
 
 
+
+
+
 app.get("/users/me", authenticateJWT, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-passwordHash");
@@ -143,7 +146,7 @@ app.get("/users/me", authenticateJWT, async (req, res) => {
 
 
 
-app.post("/apps/cod-order", async (req, res) => {
+app.post("/apps/cod-order",authenticateJWT, async (req, res) => {
   try {
     const body = req.body;
     console.log("New COD Order Received:", body);
@@ -244,6 +247,20 @@ app.get("/apps/cod-order/:id", async (req, res) => {
   } catch (err) {
     console.error("Error fetching single order:", err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+
+app.post("/users/logout", authenticateJWT, (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader.split(" ")[1];
+    tokenBlacklist.add(token); // Add token to blacklist
+    res.json({ success: true, message: "Logout successful" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
