@@ -1,3 +1,8 @@
+
+
+
+
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -44,15 +49,80 @@ app.post("/apps/cod-order", async (req, res) => {
   }
 });
 
+// app.get("/apps/cod-order", async (req, res) => {
+//   try {
+//     const orders = await Order.find().sort({ created_at: -1 }); // latest first
+//     res.status(200).json({ success: true, orders });
+//   } catch (err) {
+//     console.error("Error fetching orders:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+
+
 app.get("/apps/cod-order", async (req, res) => {
   try {
-    const orders = await Order.find().sort({ created_at: -1 }); // latest first
-    res.status(200).json({ success: true, orders });
+    // Flexible: Accept both page/limit OR skip/limit
+    let page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 10;
+
+    // If frontend uses skip instead of page
+    if (req.query.skip !== undefined) {
+      const skip = parseInt(req.query.skip) || 0;
+      page = Math.floor(skip / limit) + 1;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const search = (req.query.search || "").trim();
+    const sortBy = req.query.sortBy || "createdAt"; // use createdAt (Mongo auto field)
+    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+
+    // Search query
+    let searchQuery = {};
+    if (search) {
+      searchQuery = {
+        $or: [
+          { "customer.name": { $regex: search, $options: "i" } },
+          { "customer.phone": { $regex: search, $options: "i" } },
+          { "main_product.title": { $regex: search, $options: "i" } },
+        ],
+      };
+    }
+
+    // Fetch data
+    const [orders, total] = await Promise.all([
+      Order.find(searchQuery)
+        .sort({ [sortBy]: sortOrder })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments(searchQuery),
+    ]);
+
+    // Always return pagination info (safe even when total = 0)
+    const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
+
+    res.json({
+      success: true,
+      orders,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalOrders: total,
+        limit,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    });
   } catch (err) {
     console.error("Error fetching orders:", err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+
 
 // GET /apps/cod-order/:id
 app.get("/apps/cod-order/:id", async (req, res) => {
