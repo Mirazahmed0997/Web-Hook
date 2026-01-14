@@ -11,12 +11,30 @@ dotenv.config();
 
 const app = express();
 
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
+const corsMiddleware = cors({
+  origin: true,
+  credentials: true,
+});
+
+export default function handler(req, res) {
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization"
+    );
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    return res.status(200).end();
+  }
+
+  corsMiddleware(req, res, () => {
+    if (req.method === "POST") {
+      return res.status(200).json({ success: true });
+    }
+  });
+}
 
 app.use(express.json());
 
