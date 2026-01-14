@@ -148,7 +148,7 @@ app.get("/users/me", authenticateJWT, async (req, res) => {
 
 
 
-app.post("/apps/cod-order",authenticateJWT, async (req, res) => {
+app.post("/apps/cod-order", async (req, res) => {
   try {
     const body = req.body;
     console.log("New COD Order Received:", body);
