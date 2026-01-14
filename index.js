@@ -11,30 +11,12 @@ dotenv.config();
 
 const app = express();
 
-const corsMiddleware = cors({
-  origin: true,
-  credentials: true,
-});
-
-export default function handler(req, res) {
-  // Handle preflight
-  if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization"
-    );
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    return res.status(200).end();
-  }
-
-  corsMiddleware(req, res, () => {
-    if (req.method === "POST") {
-      return res.status(200).json({ success: true });
-    }
-  });
-}
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 
@@ -166,7 +148,7 @@ app.get("/users/me", authenticateJWT, async (req, res) => {
 
 
 
-app.post("/apps/cod-order", async (req, res) => {
+app.post("/apps/cod-order",authenticateJWT, async (req, res) => {
   try {
     const body = req.body;
     console.log("New COD Order Received:", body);
